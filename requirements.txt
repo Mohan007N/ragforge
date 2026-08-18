@@ -1,0 +1,13 @@
+langchain
+langchain-community
+langchain-ollama
+langchain-chroma
+langchain-experimental
+chromadb
+pypdf
+sentence-transformers
+fastapi
+uvicorn
+python-multipart
+pydantic
+streamlit
