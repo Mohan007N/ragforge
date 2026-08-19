@@ -11,9 +11,17 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=1, description="User's question")
-    top_k: int = Field(default=FINAL_TOP_K, ge=1, le=20, description="Number of top chunks to retrieve")
+    top_k: Optional[int] = Field(default=None, description="Number of top chunks to retrieve")
+    k: Optional[int] = Field(default=None, description="Legacy parameter for top_k")
     model_name: str = Field(default=DEFAULT_MODEL, description="Ollama model name")
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=1.0, description="LLM temperature")
+
+    def get_top_k(self) -> int:
+        if self.top_k is not None:
+            return self.top_k
+        if self.k is not None:
+            return self.k
+        return FINAL_TOP_K
 
 class SourceChunk(BaseModel):
     chunk_id: int
@@ -54,6 +62,7 @@ async def health_check():
     )
 
 @router.post("/chat", response_model=QueryResponse)
+@router.post("/query", response_model=QueryResponse)
 async def chat_query(payload: QueryRequest):
     """
     Process a user question and return an answer with sources
@@ -76,7 +85,7 @@ async def chat_query(payload: QueryRequest):
     try:
         result = query_pipeline(
             question=payload.question,
-            top_k=payload.top_k,
+            top_k=payload.get_top_k(),
             model_name=payload.model_name,
             temperature=payload.temperature
         )

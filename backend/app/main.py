@@ -26,9 +26,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import UploadFile, File
+
 # Include API routers
 app.include_router(documents.router)
 app.include_router(chat.router)
+
+# Legacy alias endpoints for backward compatibility
+@app.post("/api/upload")
+async def legacy_upload(file: UploadFile = File(...)):
+    return await documents.upload_document(file)
+
+@app.post("/api/select_document")
+async def legacy_select_document():
+    return {"status": "success", "message": "Document selection acknowledged"}
 
 # Serve React frontend (built files)
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"

@@ -1,4 +1,5 @@
 """Complete RAG Pipeline"""
+import logging
 from typing import List, Dict, Any
 from langchain_core.documents import Document
 from app.rag.ingestion import process_pdf_document
@@ -8,6 +9,8 @@ from app.rag.retriever import hybrid_search
 from app.rag.reranker import rerank_results
 from app.rag.generator import generate_answer
 from app.config import FINAL_TOP_K, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+
+logger = logging.getLogger(__name__)
 
 def ingest_document(pdf_path: str) -> Dict[str, Any]:
     """
@@ -26,12 +29,22 @@ def ingest_document(pdf_path: str) -> Dict[str, Any]:
     # Process PDF
     chunks, doc_hash, num_pages, num_chunks = process_pdf_document(pdf_path)
     
+    if not chunks:
+        raise ValueError(
+            f"No valid text chunks could be extracted from the document. "
+            f"The PDF may be image-only or contain no readable text."
+        )
+    
+    logger.info(f"Processing {num_chunks} chunks from {pdf_path}")
+    
     # Add to vector store
-    add_documents_to_vectorstore(chunks)
+    added_to_vectorstore = add_documents_to_vectorstore(chunks)
+    logger.info(f"Added {added_to_vectorstore} chunks to vector store")
     
     # Add to BM25 index
     bm25_index = get_bm25_index()
     bm25_index.add_documents(chunks)
+    logger.info(f"Added {num_chunks} chunks to BM25 index")
     
     return {
         "document_id": doc_hash,

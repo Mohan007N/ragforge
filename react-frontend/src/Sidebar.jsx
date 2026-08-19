@@ -1,38 +1,112 @@
-import React, { useRef, useState } from 'react';
-import { UploadCloud, FileText, Database, Trash2 } from 'lucide-react';
+import React, { useRef, useState, useCallback } from 'react';
+import { UploadCloud, FileText, Trash2, Plus, PanelLeftClose, Sparkles } from 'lucide-react';
 
-export default function Sidebar({ documents, onUpload, onDelete, health }) {
+export default function Sidebar({ 
+  documents, 
+  onUpload, 
+  onDelete, 
+  health, 
+  isOpen, 
+  onToggle, 
+  onNewChat,
+  uploadProgress,
+  isUploading
+}) {
   const fileInputRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const handleUploadClick = () => {
-    fileInputRef.current.click();
+    if (!isUploading) {
+      fileInputRef.current.click();
+    }
   };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setIsUploading(true);
       await onUpload(file);
-      setIsUploading(false);
-      e.target.value = null; // reset input
+      e.target.value = null;
     }
   };
 
   const handleDelete = async (e, documentId) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this document?')) {
+    if (confirm('Delete this document and all its indexed data?')) {
       await onDelete(documentId);
     }
   };
 
-  return (
-    <div className="glass-panel sidebar">
-      <h2><Database size={24} /> RAGForge v2.0</h2>
+  // Drag & drop handlers
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
 
-      <div className="upload-zone" onClick={handleUploadClick}>
-        <UploadCloud size={32} color="var(--text-secondary)" />
-        <p>{isUploading ? 'Uploading & Indexing...' : 'Click to Upload PDF'}</p>
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const pdfFile = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
+    
+    if (pdfFile) {
+      await onUpload(pdfFile);
+    }
+  }, [onUpload]);
+
+  const totalChunks = health?.documents?.total_chunks || 0;
+  const ollamaOnline = health?.ollama?.available;
+
+  return (
+    <div className={`sidebar ${isOpen ? '' : 'collapsed'}`}>
+      {/* Header */}
+      <div className="sidebar-header">
+        <div className="sidebar-brand">
+          <div className="brand-icon">
+            <Sparkles size={18} />
+          </div>
+          <span>RAGForge</span>
+        </div>
+        <button 
+          className="sidebar-toggle-btn" 
+          onClick={onToggle}
+          title="Close sidebar"
+        >
+          <PanelLeftClose size={18} />
+        </button>
+      </div>
+
+      {/* New Chat Button */}
+      <button className="new-chat-btn" onClick={onNewChat}>
+        <Plus size={16} />
+        New conversation
+      </button>
+
+      {/* Upload Zone */}
+      <div 
+        className={`upload-zone ${dragOver ? 'drag-over' : ''} ${isUploading ? 'uploading' : ''}`}
+        onClick={handleUploadClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div className="upload-icon">
+          <UploadCloud size={24} />
+        </div>
+        <span className="upload-label">
+          {isUploading ? 'Processing document...' : 'Upload PDF'}
+        </span>
+        <span className="upload-sublabel">
+          {isUploading ? '' : 'Click or drag & drop'}
+        </span>
         <input 
           type="file" 
           accept=".pdf" 
@@ -40,27 +114,39 @@ export default function Sidebar({ documents, onUpload, onDelete, health }) {
           onChange={handleFileChange}
           disabled={isUploading}
         />
+        {isUploading && (
+          <div 
+            className="upload-progress" 
+            style={{ width: `${Math.max(uploadProgress, 15)}%` }} 
+          />
+        )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Documents</span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          {health?.documents?.total_chunks || 0} chunks
+      {/* Documents Section */}
+      <div className="docs-section-header">
+        <span className="docs-section-title">Documents</span>
+        <span className="docs-section-count">
+          {totalChunks > 0 ? `${totalChunks} chunks` : ''}
         </span>
       </div>
 
       <ul className="doc-list">
-        {documents.map((doc) => (
+        {documents.map((doc, index) => (
           <li 
             key={doc.document_id} 
             className="doc-item"
+            style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-              <FileText size={16} color="var(--accent-color)" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="doc-item-name" title={doc.filename}>{doc.filename}</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                  {doc.pages} pages • {doc.chunks} chunks • {doc.file_size_mb}MB
+            <div className="doc-item-info">
+              <div className="doc-item-icon">
+                <FileText size={16} />
+              </div>
+              <div className="doc-item-details">
+                <div className="doc-item-name" title={doc.filename}>
+                  {doc.filename}
+                </div>
+                <div className="doc-item-meta">
+                  {doc.pages} pages · {doc.chunks} chunks · {doc.file_size_mb} MB
                 </div>
               </div>
             </div>
@@ -74,19 +160,23 @@ export default function Sidebar({ documents, onUpload, onDelete, health }) {
           </li>
         ))}
         {documents.length === 0 && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', marginTop: '1rem' }}>
+          <p className="empty-docs-msg">
             No documents uploaded yet.
+            <br />
+            Upload a PDF to get started.
           </p>
         )}
       </ul>
 
-      <div className="status-indicator">
-        <div className={`dot ${health?.ollama?.available ? 'online' : 'offline'}`}></div>
-        <span>Ollama: {health?.ollama?.available ? 'Online' : 'Offline'}</span>
-      </div>
-      
-      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
-        Hybrid Retrieval + Reranking
+      {/* Footer */}
+      <div className="sidebar-footer">
+        <div className="status-row">
+          <div className={`status-dot ${ollamaOnline ? 'online' : 'offline'}`} />
+          <span>Ollama: {ollamaOnline ? 'Connected' : 'Offline'}</span>
+        </div>
+        <div className="sidebar-footnote">
+          Hybrid retrieval · Cross-encoder reranking
+        </div>
       </div>
     </div>
   );

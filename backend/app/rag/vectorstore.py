@@ -24,9 +24,19 @@ def add_documents_to_vectorstore(chunks: List[Document]) -> int:
     Returns:
         Number of chunks added
     """
+    # Safety filter: remove any chunks with empty/whitespace-only content
+    # to prevent TextEncodeInput errors in the HuggingFace tokenizer
+    valid_chunks = [
+        chunk for chunk in chunks 
+        if chunk.page_content and chunk.page_content.strip()
+    ]
+    
+    if not valid_chunks:
+        return 0
+    
     vectorstore = get_vectorstore()
-    vectorstore.add_documents(chunks)
-    return len(chunks)
+    vectorstore.add_documents(valid_chunks)
+    return len(valid_chunks)
 
 def semantic_search(query: str, k: int = 10) -> List[tuple]:
     """

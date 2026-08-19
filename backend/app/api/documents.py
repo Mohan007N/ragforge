@@ -1,5 +1,6 @@
 """Document management API endpoints"""
 import os
+import logging
 import shutil
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -9,6 +10,8 @@ from app.config import DATA_DIR
 from app.rag.pipeline import ingest_document, delete_document
 from app.rag.ingestion import generate_document_hash
 from app.database.metadata import get_metadata_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -49,14 +52,16 @@ async def upload_document(file: UploadFile = File(...)):
     """Upload and index a PDF document"""
     # Validate file type
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        raise HTTPException(status_code=400, detail="Only PDF files are supported. Please upload a .pdf file.")
     
     # Save file
     file_path = DATA_DIR / file.filename
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        logger.info(f"Saved file: {file.filename} ({os.path.getsize(file_path)} bytes)")
     except Exception as e:
+        logger.error(f"Failed to save file {file.filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
     
     # Generate document hash
@@ -85,14 +90,24 @@ async def upload_document(file: UploadFile = File(...)):
             file_size=file_size
         )
         
+        logger.info(f"Successfully indexed {file.filename}: {result['pages']} pages, {result['chunks']} chunks")
+        
         return {
             "status": "success",
             "message": f"Successfully processed and indexed '{file.filename}'",
             "document": result
         }
     
+    except ValueError as e:
+        # Content-related issues (e.g., no extractable text, image-only PDF)
+        logger.warning(f"Content error processing {file.filename}: {e}")
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(status_code=400, detail=str(e))
+    
     except Exception as e:
         # Clean up file if ingestion fails
+        logger.error(f"Failed to index {file.filename}: {e}", exc_info=True)
         if file_path.exists():
             file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Failed to index document: {str(e)}")

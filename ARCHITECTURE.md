@@ -1,4 +1,4 @@
-# RAGForge - Complete Architecture & Technology Stack
+# RAGForge v2.0 - Complete Architecture & Technology Stack
 
 ## 🏗️ System Architecture
 
@@ -17,19 +17,20 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER                            │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │          FastAPI Backend (Port 8000)                      │  │
+│  │          FastAPI Backend (backend/app/main.py)            │  │
 │  │  ┌────────────────────────────────────────────────────┐  │  │
 │  │  │  REST API Endpoints                                 │  │  │
-│  │  │  - POST /api/upload      → Upload PDF              │  │  │
-│  │  │  - GET  /api/documents   → List documents          │  │  │
-│  │  │  - POST /api/select_document → Switch doc          │  │  │
-│  │  │  - POST /api/query       → Ask questions           │  │  │
-│  │  │  - GET  /api/health      → System status           │  │  │
-│  │  │  - GET  /                → Serve frontend           │  │  │
+│  │  │  - POST /api/documents/upload → Upload & index PDF   │  │  │
+│  │  │  - GET  /api/documents        → List documents     │  │  │
+│  │  │  - DELETE /api/documents/{id} → Delete document    │  │  │
+│  │  │  - POST /api/chat             → Hybrid RAG query     │  │  │
+│  │  │  - POST /api/search           → Retrieval search   │  │  │
+│  │  │  - GET  /api/health           → System health      │  │  │
+│  │  │  - GET  /                     → Serve frontend      │  │  │
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  │  ┌────────────────────────────────────────────────────┐  │  │
-│  │  │  Middleware                                         │  │  │
-│  │  │  - CORS (allow all origins)                        │  │  │
+│  │  │  Middleware & Config                                │  │  │
+│  │  │  - CORS (allow origins)                            │  │  │
 │  │  │  - Static file serving (/frontend)                 │  │  │
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  └──────────────────────┬───────────────────────────────────┘  │
@@ -39,35 +40,31 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                      RAG PIPELINE LAYER                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    rag_pipeline.py                        │  │
+│  │                   backend/app/rag/                        │  │
 │  │                                                           │  │
 │  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │  1. Document Processing                          │    │  │
+│  │  │  1. Document Processing (ingestion.py)           │    │  │
 │  │  │     - PyPDFLoader (load PDF)                     │    │  │
-│  │  │     - Metadata enrichment (filename, page)       │    │  │
+│  │  │     - RecursiveCharacterTextSplitter             │    │  │
+│  │  │     - SHA256 Hash Deduplication                  │    │  │
 │  │  └─────────────────────────────────────────────────┘    │  │
 │  │                     ▼                                     │  │
 │  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │  2. Semantic Chunking (300 chars)               │    │  │
-│  │  │     - SemanticChunker (embedding-based)          │    │  │
-│  │  │     - Breakpoint detection (95th percentile)     │    │  │
-│  │  │     - Post-split to 300 characters               │    │  │
-│  │  │     - Preserve metadata across chunks            │    │  │
+│  │  │  2. Hybrid Indexing                              │    │  │
+│  │  │     - ChromaDB Vector Store (embeddings.py)      │    │  │
+│  │  │     - BM25 Keyword Search Index (bm25.py)          │    │  │
 │  │  └─────────────────────────────────────────────────┘    │  │
 │  │                     ▼                                     │  │
 │  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │  3. Embedding Generation                         │    │  │
-│  │  │     - HuggingFace Embeddings                     │    │  │
-│  │  │     - Model: sentence-transformers/              │    │  │
-│  │  │              all-MiniLM-L6-v2                    │    │  │
-│  │  │     - Dimension: 384                             │    │  │
+│  │  │  3. Hybrid Retrieval & Reranking                 │    │  │
+│  │  │     - Dense Vector Search + BM25 Fusion (60/40)   │    │  │
+│  │  │     - Cross-Encoder Reranker (reranker.py)       │    │  │
 │  │  └─────────────────────────────────────────────────┘    │  │
 │  │                     ▼                                     │  │
 │  │  ┌─────────────────────────────────────────────────┐    │  │
-│  │  │  4. Query Processing                             │    │  │
-│  │  │     - Semantic search (top-k retrieval)          │    │  │
-│  │  │     - Context formatting with page refs          │    │  │
-│  │  │     - LLM prompt construction                    │    │  │
+│  │  │  4. LLM Generation (generator.py)               │    │  │
+│  │  │     - Ollama Integration (phi3:mini)             │    │  │
+│  │  │     - Context-grounded response with citations   │    │  │
 │  │  └─────────────────────────────────────────────────┘    │  │
 │  └──────────────────────┬───────────────────────────────────┘  │
 └─────────────────────────┼──────────────────────────────────────┘
@@ -77,16 +74,14 @@
 ┌──────────────────────────┐  ┌──────────────────────────┐
 │   STORAGE LAYER          │  │    LLM LAYER             │
 │  ┌────────────────────┐  │  │  ┌────────────────────┐  │
-│  │  ChromaDB          │  │  │  │  Ollama            │  │
-│  │  Vector Database   │  │  │  │  (Local LLM)       │  │
+│  │  ChromaDB & BM25   │  │  │  │  Ollama            │  │
+│  │  Vector & Keyword  │  │  │  │  (Local LLM)       │  │
 │  │  - Persist to disk │  │  │  │  - phi3:mini       │  │
-│  │  - Cosine similarity│  │  │  │  - Port: 11434    │  │
-│  │  - Metadata filter │  │  │  │  - Temp: 0.1       │  │
-│  └────────────────────┘  │  │  └────────────────────┘  │
+│  └────────────────────┘  │  │  │  - Port: 11434    │  │
 │  ┌────────────────────┐  │  └──────────────────────────┘
 │  │  File System       │  │
-│  │  - /data/*.pdf     │  │
-│  │  - /chroma_db/*    │  │
+│  │  - backend/data/   │  │
+│  │  - backend/storage/│  │
 │  └────────────────────┘  │
 └──────────────────────────┘
 ```
@@ -122,10 +117,8 @@
 | Component | Technology | Version | Purpose |
 |-----------|-----------|---------|---------|
 | **RAG Framework** | LangChain | Latest | LLM orchestration |
-| **LangChain Core** | langchain-community | Latest | Community integrations |
-| **LangChain Ollama** | langchain-ollama | Latest | Ollama integration |
-| **LangChain Chroma** | langchain-chroma | Latest | ChromaDB integration |
-| **Experimental** | langchain-experimental | Latest | Semantic chunking |
+| **Keyword Search** | rank-bm25 | Latest | BM25 retrieval |
+| **Reranker** | sentence-transformers | Latest | Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) |
 | **PDF Parser** | PyPDF | Latest | Extract text from PDFs |
 | **Embeddings** | sentence-transformers | Latest | Text embeddings |
 | **Embedding Model** | all-MiniLM-L6-v2 | - | 384-dim embeddings |
