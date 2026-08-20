@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ragforge-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: GOOGLE_API_KEY
+        sync: false
+    disk:
+      name: ragforge-storage
+      mountPath: /opt/render/project/src/backend/storage
+      sizeGB: 5
