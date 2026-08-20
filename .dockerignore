@@ -1,0 +1,22 @@
+# Root .dockerignore
+.git/
+.github/
+.vscode/
+.idea/
+venv/
+backend/venv/
+backend/storage/
+backend/data/documents/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+react-frontend/node_modules/
+react-frontend/dist/
+frontend/
+*.log
+.env
+.env.local
+backend/.env
+backend/.env.local
+test_website.py
+start_server.md

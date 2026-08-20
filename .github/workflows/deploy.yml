@@ -1,0 +1,57 @@
+name: Build & Publish Container Images
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and Validate Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Unified Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ragforge:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Unified Container Startup & Health
+        run: |
+          docker run -d --name test-ragforge -p 8000:8000 ragforge:latest
+          sleep 10
+          docker logs test-ragforge
+          curl -f http://localhost:8000/api/health || exit 1
+          docker stop test-ragforge
+
+      - name: Build Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: ragforge-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./react-frontend
+          file: ./react-frontend/Dockerfile
+          push: false
+          tags: ragforge-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -74,7 +74,14 @@ async def legacy_select_document():
     return {"status": "success", "message": "Document selection acknowledged"}
 
 # Serve React frontend (built files)
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+_default_frontend = Path(__file__).parent.parent.parent / "frontend"
+if not _default_frontend.exists():
+    # Try adjacent frontend directory (e.g., in containerized flat layout)
+    _alt_frontend = Path(__file__).parent.parent / "frontend"
+    if _alt_frontend.exists():
+        _default_frontend = _alt_frontend
+
+FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", str(_default_frontend)))
 
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")

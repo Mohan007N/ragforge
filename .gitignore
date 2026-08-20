@@ -22,7 +22,11 @@ data/*.pdf
 # Environment
 .env
 .env.local
+.env.production
+.env.prod
 backend/.env
+backend/.env.local
+backend/.env.production
 
 # IDEs
 .vscode/
