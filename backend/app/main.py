@@ -122,7 +122,7 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.getenv("HOST", "127.0.0.1")
+    host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     app_target = "app.main:app" if (Path.cwd() / "app" / "main.py").exists() else "main:app"
     uvicorn.run(app_target, host=host, port=port, reload=True)
