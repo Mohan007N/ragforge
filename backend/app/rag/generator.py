@@ -94,7 +94,7 @@ def generate_answer(
     
     # Ollama is available, generate answer
     try:
-        llm = ChatOllama(model=model_name, temperature=temperature)
+        llm = ChatOllama(model=model_name, temperature=temperature, base_url=OLLAMA_BASE_URL)
         
         prompt = ChatPromptTemplate.from_template("""You are RAGForge, a document question-answering assistant.
 

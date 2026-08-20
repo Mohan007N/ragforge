@@ -137,7 +137,7 @@ async def search_documents(payload: QueryRequest):
         candidates = hybrid_search(payload.question)
         
         # Rerank
-        reranked = rerank_results(payload.question, candidates, top_k=payload.top_k)
+        reranked = rerank_results(payload.question, candidates, top_k=payload.get_top_k())
         
         # Format response
         sources = []
